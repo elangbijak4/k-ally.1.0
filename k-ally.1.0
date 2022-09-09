@@ -1,0 +1,211 @@
+from numpy import square
+import pandas as pd
+import random
+import math
+
+class Kally:
+  def __init__(self,data,columns,k=3,min_index_data=0,iteration=10,treshold=0.05) -> None:
+      #import pandas as pd
+      self.data = data
+      self.columns=columns
+      self.data_frame = pd.DataFrame(data=data, columns=columns)
+      self.iteration=iteration
+      self.treshold=treshold
+      self.mean=None
+      self.label=[]
+
+      #Inisiasi label setiap rekord dataset dengan None
+      for i in self.data_frame:
+        self.data_frame['label']=None
+      
+      #Buat pusat_sekutu
+      self.pusat_sekutu=self.build_centroid_random(k,min_index_data,max(self.data_frame.index))
+      
+      #Labeli pusat_sekutu dengan nilainya sendiri (label iterasi ganjil)
+      r=0
+      C=[]
+      for i in self.pusat_sekutu:
+        r=r+1
+        self.data_frame.at[i,'label']="C"+str(r)
+        C=C+["C"+str(r)]
+      #print(C)
+      self.label=C
+
+      #Labeli pusat_sekutu dengan nilainya sendiri (label iterasi genap)
+      r=0
+      K=[]
+      for i in self.pusat_sekutu:
+        r=r+1
+        self.data_frame.at[i,'label']="K"+str(r)
+        K=K+["K"+str(r)]
+      #print(K)
+
+      #Pilih kolom yang mau dijadikan komponen jarak, cukup indeks kolomnya saja
+      self.komponen=[i for i in range(0,len(self.data_frame.columns)-1)]
+      print('self.komponen = ',self.komponen)
+      
+      #Pindah ke alamat memori baru
+      p=[None for y in self.pusat_sekutu]
+      self.centroid=[i for i in self.pusat_sekutu]
+      for y in range(len(self.centroid)):
+        p[y]=[]
+        for i in self.komponen: p[y]=p[y]+[self.data_frame.loc[self.centroid[y]][i]]
+      
+      for t in range(self.iteration):
+        '''
+        Tahap pelabelan atau klasterisasi berdasarkan kemiripan untuk bersekutu.
+        Tahap pelabelan untuk satu iterasi.
+        '''
+        for x in self.data_frame.index:
+          if self.data_frame.loc[x]['label'] not in self.label:
+            jarak_list=[]
+            #Ukur jarak antara setiap titik centroid dengan setiap titik x di data_frame
+            q=[]
+            for i in self.komponen: q=q+[self.data_frame.loc[x][i]]
+            for y in p:
+              jarak_list=jarak_list+[self.distance_ally(y, q)]
+            for w in range(len(jarak_list)): 
+              if jarak_list[w]==min(jarak_list):
+                #print('jarak_list=',jarak_list)
+                #print('jarak_list[',w,']',jarak_list[w])
+                #print('min(jarak_list)=',min(jarak_list))
+                #print('rekord sebelum pelabelan: ',self.data_frame.loc[x])
+                self.data_frame.at[x,'label']=C[w]  #self.data_frame.at[self.pusat_sekutu[w],'label']
+                #print('rekord SETELAH pelabelan: ',self.data_frame.loc[x])
+                self.centroid[w]=x #apakah ini perlu?
+                #print('sebelum:',p)
+                p[w]=[self.data_frame.at[x,self.data_frame.columns[i]] for i in self.komponen] #disini masalahnya lan!
+                #print('p[',w,']',p[w])
+                #print('sesudah:',p)
+
+        '''
+        Perhitungan ulang centroid klaster setelah pelabelan selesai.
+        Kemudian p diganti dengan centroid baru hasil perhitungan self.mean.
+        Titik p kemudian digunakan untuk iterasi berikut.
+        '''
+        #print('p : ',p)
+        #print(id(p))
+        self.mean=self.calculate_mean(self.data_frame,self.pusat_sekutu,self.komponen)
+        #print('self.mean : ',self.mean)
+        #print(id(self.mean))
+        rerata_mse=0
+        for i in range(len(p)):
+          rerata_mse=rerata_mse+self.mse(p[i],self.mean[i])
+        #print('rerata_mse iterasi ',t,' ke ',t+1,' = ',rerata_mse)
+        
+        #print('p sebelum =', p)
+        #print('self.mean sesudah hitung mean =', self.mean)
+        p=[i for i in self.mean]
+        #print('p sesudah persamaan dengan self.mean =', p)
+        #print('self.mean sesudah persamaan dengan p =', self.mean)
+        #print(self.mean)
+        #self.centroid=[i for i in self.centroid]
+        #print('self.label sebelumnya: ',self.label)
+        if self.label==C :
+          self.label=K
+        else:
+          self.label=C
+        #print('self.label SESUDAHNYA: ',self.label)
+        lst=[i for i in self.data_frame[self.data_frame.columns[len(self.komponen)]]]
+        #self.plot(lst,x=self.data_frame.columns[0],y=self.data_frame.columns[1],s=50)
+        print(lst)
+        cols=self.pltcolor(lst)
+        self.data_frame.plot.scatter(x=self.data_frame.columns[0],y=self.data_frame.columns[1],s=50,c=cols)
+
+  #Fungsi untuk pemetaan warna titik:
+  def pltcolor(self,lst):
+      cols=[]
+      for l in lst:
+          if l=='C1':
+              cols.append('red')
+          elif l=='C2':
+              cols.append('blue')
+          elif l=='C3':
+              cols.append('green')
+          elif l=='C4':
+              cols.append('black')
+          elif l=='C5':
+              cols.append('grey')
+          elif l=='C6':
+              cols.append('yellow')
+          elif l=='C7':
+              cols.append('pink')
+          elif l=='C8':
+              cols.append('purple')
+          else:
+              cols.append('brown')
+      return cols
+
+  #Fungsi untuk plotting 2D
+  def plot(self,lst,x,y,s=50):
+    #lst=[i for i in tes.data_frame[tes.data_frame.columns[4]]]
+    #self.pltcolor(lst)
+    cols=self.pltcolor(lst)
+    tes.data_frame.plot.scatter(x,y,s=50,c=cols)
+
+  #Fungsi MSE (Mean Squarred Error)
+  def mse(self, vektor1, vektor2):
+    try:
+      jarak=0
+      square_sum=0
+      for i in range(len(vektor1)):
+        jarak=vektor1[i]-vektor2[i]
+        square=jarak*jarak
+        square_sum=square_sum+square
+      _mse=square_sum/len(vektor1)
+    except:
+      print('terjadi kesalahan: mungkin panjang vektor yang dikuru tidak sama, atau indeks vektor bukan 0,1,2,..')
+    finally:
+      return _mse
+  
+  #Fungsi Jarak
+  def distance_ally(self,p,q):
+    #import math
+    kuadrat_komponen=[]
+    #print('p = ',p)
+    #print('q = ',q)
+    for i in range(len(p)):
+      kuadrat_komponen=kuadrat_komponen+[(p[i]-q[i])*(p[i]-q[i])]
+      #print(kuadrat_komponen)
+    jumlah=0
+    for i in kuadrat_komponen:
+      jumlah=jumlah+i
+    return math.sqrt(jumlah)
+  
+  #Fungsi random
+  def build_centroid_random(self,k,min,max):
+    #import random
+    centroid=[]
+    for i in range(k):
+      a=random.randint(min,max) 
+      if a not in centroid:
+        centroid=centroid+[a]
+    return centroid
+
+  #Alhamdulillah kode ini sudah diuji untuk menghitung mean perklaster
+  def calculate_mean(self,data_frame,pusat_sekutu,komponen):
+    #print(data_frame)
+    #print(pusat_sekutu)
+    #print(komponen)
+    total_perklaster=[0 for i in pusat_sekutu]
+    counter_klaster=[0 for i in pusat_sekutu]
+    for y in range(len(pusat_sekutu)):
+      total_perklaster[y]=[0 for j in komponen]
+    for y in range(len(pusat_sekutu)):
+      sum=[0 for i in komponen]
+      counter_detil=0
+      for w in komponen:
+        for x in data_frame.index:
+          if data_frame.loc[x]['label']==data_frame.loc[pusat_sekutu[y]]['label']:
+            sum[w]=sum[w]+data_frame.at[x,data_frame.columns[w]]
+            if w==0 : counter_detil=counter_detil+1
+      counter_klaster[y]=counter_detil
+      total_perklaster[y]=sum
+
+    #Hitung mean:
+    mean_perklaster=[0 for y in pusat_sekutu]
+    for y in range(len(pusat_sekutu)):
+      if counter_klaster[y]!=0:
+        mean_perklaster[y]=[total_perklaster[y][q]/counter_klaster[y] for q in komponen]
+
+    return mean_perklaster
